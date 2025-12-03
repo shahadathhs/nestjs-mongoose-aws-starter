@@ -1,0 +1,31 @@
+# Dependencies
+node_modules
+.pnpm-store
+dist
+
+# App data
+data
+logs
+temp
+uploads
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Dev tools
+.git
+.vscode
+.vercel
+
+# Cache
+.cache
+npm-debug.log
+pnpm-debug.log
+
+# Docker
+docker-compose.yml
+docker-compose.dev.yml
+compose.yaml
+compose.dev.yaml

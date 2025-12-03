@@ -1,0 +1,173 @@
+services:
+  caddy:
+    profiles: ['prod']
+    image: caddy
+    container_name: ${PACKAGE_NAME}_caddy
+    restart: always
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'caddy validate --config /etc/caddy/Caddyfile']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  coturn:
+    profiles: ['prod']
+    image: instrumentisto/coturn:latest
+    platform: linux/amd64
+    container_name: ${PACKAGE_NAME}_coturn
+    restart: always
+    ports:
+      - '3478:3478/tcp'
+      - '3478:3478/udp'
+      - '5349:5349/tcp'
+      - '5349:5349/udp'
+    env_file:
+      - .env
+    environment:
+      - TURN_USERS=${TURN_USERS}
+      - TURN_REALM=${PACKAGE_NAME}_turn
+      - TURN_VERBOSE=1
+      - TURN_LT_CREDENTIALS=1
+      - EXTERNAL_IP=${EXTERNAL_IP}
+    command: >
+      -n
+      --log-file=stdout
+      --min-port=49152
+      --max-port=65535
+      --no-stdout-log
+      --user=${TURN_USERS}
+      --realm=${PACKAGE_NAME}_turn
+      --external-ip=${EXTERNAL_IP}
+    healthcheck:
+      test: ['CMD-SHELL', 'nc -zv -w 2 127.0.0.1 3478 || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  api:
+    profiles: ['prod']
+    platform: linux/amd64
+    image: ${DOCKER_USERNAME}/${PACKAGE_NAME}:${PACKAGE_VERSION}
+    container_name: ${PACKAGE_NAME}_api
+    restart: always
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/${PACKAGE_NAME}_db
+
+      REDIS_HOST: redis-master
+      REDIS_PORT: 6379
+
+      BASE_URL: http://0.0.0.0:3000
+      PORT: 3000
+    ports:
+      - '3000:3000'
+    depends_on:
+      db:
+        condition: service_healthy
+      redis-master:
+        condition: service_healthy
+    command: >
+      sh -c "
+        echo '🏁 Waiting for DB...';
+        sleep 5;
+        npx prisma migrate deploy;
+        echo '🚀 Starting app...';
+        pnpm start
+      "
+    volumes:
+      - files-data:/app/uploads
+      - temp-data:/app/tmp
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://0.0.0.0:3000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  db:
+    profiles: ['dev', 'prod']
+    image: postgres:17
+    container_name: ${PACKAGE_NAME}_db
+    restart: always
+    user: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${PACKAGE_NAME}_db
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - '127.0.0.1:5433:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-master:
+    profiles: ['dev', 'prod']
+    image: redis
+    container_name: ${PACKAGE_NAME}_redis-master
+    command:
+      [
+        'redis-server',
+        '--appendonly',
+        'yes',
+        '--bind',
+        '0.0.0.0',
+        '--protected-mode',
+        'no',
+      ]
+    ports:
+      - '22376:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: always
+
+  redis-replica:
+    profiles: ['prod']
+    image: redis
+    container_name: ${PACKAGE_NAME}_redis-replica
+    command:
+      [
+        'redis-server',
+        '--replicaof',
+        'redis-master',
+        '6379',
+        '--bind',
+        '0.0.0.0',
+        '--protected-mode',
+        'no',
+      ]
+    ports:
+      - '22377:6379'
+    depends_on:
+      - redis-master
+    restart: always
+
+volumes:
+  db_data:
+  files-data:
+  temp-data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  default:
+    name: ${PACKAGE_NAME}_network
+    labels:
+      - 'project=${PACKAGE_NAME}'
