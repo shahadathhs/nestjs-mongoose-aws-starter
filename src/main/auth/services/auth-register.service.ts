@@ -36,7 +36,10 @@ export class AuthRegisterService {
     });
 
     // Generate OTP and save
-    const otp = await this.utils.generateOTPAndSave(newUser._id, OtpType.VERIFICATION);
+    const otp = await this.utils.generateOTPAndSave(
+      newUser._id,
+      OtpType.VERIFICATION,
+    );
 
     // Send verification email
     await this.authMailService.sendVerificationCodeEmail(

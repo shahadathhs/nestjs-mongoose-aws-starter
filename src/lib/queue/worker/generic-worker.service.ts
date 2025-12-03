@@ -32,7 +32,7 @@ export class GenericWorkerService extends WorkerHost {
         createdAt: new Date(),
         meta: {
           recordType: 'User',
-          recordId: admin.id,
+          recordId: admin._id,
           performedBy: admin.name,
         },
       };

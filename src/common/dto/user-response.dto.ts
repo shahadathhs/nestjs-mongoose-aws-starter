@@ -1,4 +1,4 @@
-import { UserRole, UserStatus } from '@prisma';
+import { UserRole, UserStatus } from '@/lib/database/enums';
 import { Expose } from 'class-transformer';
 
 export class UserResponseDto {

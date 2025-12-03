@@ -45,6 +45,7 @@
     "replicaof",
     "softvence",
     "USEPOLLING",
+    "uuidv",
     "virtuals",
     "WATCHPACK",
     "webrtc",

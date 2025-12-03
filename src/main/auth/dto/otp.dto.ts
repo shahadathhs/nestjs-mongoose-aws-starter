@@ -1,5 +1,5 @@
+import { OtpType } from '@/lib/database/enums';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { OtpType } from '@prisma';
 import { IsEmail, IsEnum, IsNotEmpty } from 'class-validator';
 
 export class ResendOtpDto {

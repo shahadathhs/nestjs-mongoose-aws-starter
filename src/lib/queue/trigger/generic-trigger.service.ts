@@ -1,8 +1,10 @@
 import { QueueEventsEnum } from '@/common/enum/queue-events.enum';
-import { PrismaService } from '@/lib/prisma/prisma.service';
+import { User } from '@/lib/database/schemas/user.schema';
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { InjectModel } from '@nestjs/mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { Model } from 'mongoose';
 import { GenericPayload } from '../interface/generic.payload';
 
 @Injectable()
@@ -10,13 +12,13 @@ export class GenericTriggerService {
   private readonly logger = new Logger(GenericTriggerService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectModel(User.name) protected readonly userModel: Model<User>,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async emitEventToTriggerWorker() {
     try {
-      const superAdmin = await this.prisma.client.user.findFirst({
+      const superAdmin = await this.userModel.findOne({
         where: {
           role: 'SUPER_ADMIN',
         },
@@ -28,7 +30,7 @@ export class GenericTriggerService {
       }
 
       const payload: GenericPayload = {
-        adminId: superAdmin.id,
+        adminId: superAdmin._id,
         message: 'This is a test message for the generic queue',
         admin: superAdmin,
       };

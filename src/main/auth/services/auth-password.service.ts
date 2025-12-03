@@ -2,7 +2,10 @@ import { successResponse, TResponse } from '@/common/utils/response.util';
 import { AppError } from '@/core/error/handle-error.app';
 import { HandleError } from '@/core/error/handle-error.decorator';
 import { OtpType } from '@/lib/database/enums';
-import { UserOtp, UserOtpDocument } from '@/lib/database/schemas/user-otp.schema';
+import {
+  UserOtp,
+  UserOtpDocument,
+} from '@/lib/database/schemas/user-otp.schema';
 import { User, UserDocument } from '@/lib/database/schemas/user.schema';
 import { AuthMailService } from '@/lib/mail/services/auth-mail.service';
 import { AuthUtilsService } from '@/lib/utils/services/auth-utils.service';
@@ -15,7 +18,8 @@ import { ChangePasswordDto, ResetPasswordDto } from '../dto/password.dto';
 export class AuthPasswordService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
-    @InjectModel(UserOtp.name) private readonly userOtpModel: Model<UserOtpDocument>,
+    @InjectModel(UserOtp.name)
+    private readonly userOtpModel: Model<UserOtpDocument>,
     private readonly utils: AuthUtilsService,
     private readonly mailService: AuthMailService,
   ) {}
@@ -79,10 +83,12 @@ export class AuthPasswordService {
     if (!user) throw new AppError(404, 'User not found');
 
     // Find latest RESET OTP
-    const userOtp = await this.userOtpModel.findOne({
-      userId: user._id,
-      type: OtpType.RESET,
-    }).sort({ createdAt: -1 });
+    const userOtp = await this.userOtpModel
+      .findOne({
+        userId: user._id,
+        type: OtpType.RESET,
+      })
+      .sort({ createdAt: -1 });
 
     if (!userOtp)
       throw new AppError(400, 'OTP is not set. Please request a new one.');

@@ -2,16 +2,18 @@ import { ENVEnum } from '@/common/enum/env.enum';
 import { EventsEnum } from '@/common/enum/queue-events.enum';
 import { errorResponse, successResponse } from '@/common/utils/response.util';
 import { JWTPayload } from '@/core/jwt/jwt.interface';
-import { PrismaService } from '@/lib/prisma/prisma.service';
+import { User } from '@/lib/database/schemas/user.schema';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { InjectModel } from '@nestjs/mongoose';
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
   OnGatewayInit,
   WebSocketServer,
 } from '@nestjs/websockets';
+import { Model } from 'mongoose';
 import { Server, Socket } from 'socket.io';
 
 export abstract class BaseGateway
@@ -26,7 +28,7 @@ export abstract class BaseGateway
 
   constructor(
     protected readonly configService: ConfigService,
-    protected readonly prisma: PrismaService,
+    @InjectModel(User.name) protected readonly userModel: Model<User>,
     protected readonly jwtService: JwtService,
     loggerName: string,
   ) {
@@ -52,19 +54,19 @@ export abstract class BaseGateway
       if (!payload.sub)
         return this.disconnectWithError(client, 'Invalid token');
 
-      const user = await this.prisma.client.user.findUnique({
-        where: { id: payload.sub },
-        select: { id: true, email: true, role: true, name: true },
-      });
+      const user = await this.userModel
+        .findById(payload.sub)
+        .select('_id email role name')
+        .lean();
 
       if (!user) return this.disconnectWithError(client, 'User not found');
 
-      client.data.userId = user.id;
+      client.data.userId = user._id;
       client.data.user = payload;
-      client.join(user.id);
-      this.subscribeClient(user.id, client);
+      client.join(user._id);
+      this.subscribeClient(user._id, client);
 
-      this.logger.log(`User connected: ${user.id} (socket ${client.id})`);
+      this.logger.log(`User connected: ${user._id} (socket ${client.id})`);
       client.emit(EventsEnum.SUCCESS, successResponse(user));
     } catch (err: any) {
       this.disconnectWithError(client, err?.message ?? 'Auth failed');

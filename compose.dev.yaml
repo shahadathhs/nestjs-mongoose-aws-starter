@@ -10,7 +10,7 @@ services:
       - .env
     environment:
       NODE_ENV: development
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/${PACKAGE_NAME}_db
+      MONGODB_URI: mongodb://mongodb:27017/${PACKAGE_NAME}_db
       REDIS_HOST: redis-master
       REDIS_PORT: 6379
       BASE_URL: http://0.0.0.0:3000
@@ -20,8 +20,6 @@ services:
     volumes:
       # Mount source code for live reload
       - ./src:/usr/src/app/src:cached
-      - ./prisma:/usr/src/app/prisma:cached
-      - ./prisma.config.ts:/usr/src/app/prisma.config.ts:cached
       - ./tsconfig.json:/usr/src/app/tsconfig.json:cached
       - ./nest-cli.json:/usr/src/app/nest-cli.json:cached
 
@@ -32,16 +30,14 @@ services:
       - ./uploads:/usr/src/app/uploads
       - ./temp:/usr/src/app/temp
     depends_on:
-      db:
+      mongodb:
         condition: service_healthy
       redis-master:
         condition: service_healthy
     command: >
       sh -c "
-        echo '🏁 Waiting for DB...';
+        echo '🏁 Waiting for MongoDB...';
         sleep 3;
-        echo '🔄 Running Prisma migrations...';
-        npx prisma migrate deploy || echo 'Migration failed, continuing...';
         echo '🚀 Starting app in development mode with live reload...';
         pnpm dev
       "
@@ -52,21 +48,18 @@ services:
       retries: 5
       start_period: 40s
 
-  db:
-    image: postgres:17
-    container_name: ${PACKAGE_NAME}_dev_db
+  mongodb:
+    image: mongo:8
+    container_name: ${PACKAGE_NAME}_dev_mongodb
     restart: unless-stopped
-    user: postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: ${PACKAGE_NAME}_db
+      MONGO_INITDB_DATABASE: ${PACKAGE_NAME}_db
     volumes:
-      - dev_db_data:/var/lib/postgresql/data
+      - dev_mongodb_data:/data/db
     ports:
-      - '127.0.0.1:5433:5432'
+      - '127.0.0.1:27017:27017'
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      test: ['CMD', 'mongosh', '--eval', 'db.adminCommand("ping")']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -96,7 +89,7 @@ services:
     restart: unless-stopped
 
 volumes:
-  dev_db_data:
+  dev_mongodb_data:
   dev_redis_data:
 
 networks:

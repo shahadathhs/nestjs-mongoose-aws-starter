@@ -7,8 +7,8 @@ import {
   UnauthorizedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma';
 import { AxiosError } from 'axios';
+import { Error as MongooseError } from 'mongoose';
 import { AppError } from './handle-error.app';
 
 export function simplifyError(
@@ -16,91 +16,83 @@ export function simplifyError(
   customMessage = 'Operation Failed',
   record = 'Record',
 ): never {
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+  // Handle MongoDB driver errors (check for code property)
+  if ('code' in error && typeof error.code === 'number') {
     switch (error.code) {
-      case 'P2000':
-        throw new BadRequestException(`${record} field value too long`);
-      case 'P2001':
-        throw new NotFoundException(`${record} does not exist`);
-      case 'P2002':
+      case 11000: // Duplicate key error
         throw new ConflictException(`${record} already exists`);
-      case 'P2003':
-        throw new ConflictException(
-          `Foreign key constraint failed on ${record}`,
-        );
-      case 'P2004':
-        throw new BadRequestException(`Constraint failed on ${record}`);
-      case 'P2005':
-        throw new BadRequestException(
-          `Invalid value provided for ${record} field`,
-        );
-      case 'P2006':
-        throw new BadRequestException(
-          `Invalid data provided for ${record} field`,
-        );
-      case 'P2007':
+      case 121: // Document validation failed
         throw new BadRequestException(`Data validation error on ${record}`);
-      case 'P2008':
-        throw new InternalServerErrorException(`Failed query parsing`);
-      case 'P2009':
-        throw new InternalServerErrorException(`Failed query validation`);
-      case 'P2010':
-        throw new BadRequestException(`Raw query failed`);
-      case 'P2011':
-        throw new BadRequestException(`Null constraint violation on ${record}`);
-      case 'P2012':
-        throw new BadRequestException(`${record} missing required value`);
-      case 'P2013':
-        throw new BadRequestException(
-          `Missing required argument for ${record}`,
-        );
-      case 'P2014':
-        throw new ConflictException(
-          `Invalid relation: ${record} has conflicting records`,
-        );
-      case 'P2015':
-        throw new NotFoundException(`Related ${record} not found`);
-      case 'P2016':
-        throw new BadRequestException(`Query interpretation error`);
-      case 'P2017':
-        throw new ConflictException(`Relation record not found for ${record}`);
-      case 'P2018':
-        throw new NotFoundException(`Required connected records not found`);
-      case 'P2019':
-        throw new BadRequestException(`Input error`);
-      case 'P2020':
-        throw new BadRequestException(`Value out of range for ${record}`);
-      case 'P2021':
-        throw new NotFoundException(`Table ${record} not found`);
-      case 'P2022':
-        throw new NotFoundException(`Column for ${record} not found`);
-      case 'P2023':
-        throw new InternalServerErrorException(`Inconsistent column data`);
-      case 'P2024':
-        throw new InternalServerErrorException(`Timed out fetching ${record}`);
-      case 'P2025':
-        throw new NotFoundException(`${record} not found`);
-      case 'P2026':
-        throw new InternalServerErrorException(`Unsupported feature requested`);
-      case 'P2027':
-        throw new InternalServerErrorException(
-          `Multiple errors occurred during query`,
-        );
-      case 'P2028':
-        throw new InternalServerErrorException(`Transaction API error`);
-      case 'P2030':
-        throw new InternalServerErrorException(
-          `Database schema is out of date`,
-        );
-      case 'P2033':
-        throw new BadRequestException(`Number out of range for ${record}`);
-      case 'P2034':
-        throw new ForbiddenException(`Transaction was aborted`);
+      case 11600: // Interrupted operation
+        throw new InternalServerErrorException(`Operation was interrupted`);
+      case 13: // Unauthorized
+        throw new UnauthorizedException(`Database authorization failed`);
+      case 18: // Authentication failed
+        throw new UnauthorizedException(`Database authentication failed`);
+      case 50: // Exceeded time limit
+        throw new InternalServerErrorException(`Operation timed out`);
       default:
         throw new InternalServerErrorException(
           `Database error: ${error.message}`,
         );
     }
+  }
+
+  // Handle Mongoose validation errors
+  if (error instanceof MongooseError.ValidationError) {
+    const messages = Object.values(error.errors)
+      .map((err) => err.message)
+      .join(', ');
+    throw new BadRequestException(
+      `Validation failed for ${record}: ${messages}`,
+    );
+  }
+
+  // Handle Mongoose cast errors (invalid ObjectId, type casting, etc.)
+  if (error instanceof MongooseError.CastError) {
+    throw new BadRequestException(
+      `Invalid ${error.path}: ${error.value} is not a valid ${error.kind}`,
+    );
+  }
+
+  // Handle Mongoose document not found error
+  if (error instanceof MongooseError.DocumentNotFoundError) {
+    throw new NotFoundException(`${record} not found`);
+  }
+
+  // Handle Mongoose version error (optimistic concurrency control)
+  if (error instanceof MongooseError.VersionError) {
+    throw new ConflictException(
+      `${record} was modified by another process. Please retry.`,
+    );
+  }
+
+  // Handle Mongoose strict mode errors
+  if (error instanceof MongooseError.StrictModeError) {
+    throw new BadRequestException(
+      `Invalid field provided for ${record}: ${error.message}`,
+    );
+  }
+
+  // Handle Mongoose parallel save error
+  if (error instanceof MongooseError.ParallelSaveError) {
+    throw new ConflictException(
+      `Cannot save ${record} while another save is in progress`,
+    );
+  }
+
+  // Handle Mongoose missing schema error
+  if (error instanceof MongooseError.MissingSchemaError) {
+    throw new InternalServerErrorException(
+      `Schema not registered for ${record}`,
+    );
+  }
+
+  // Handle Mongoose divide by zero error
+  if (error instanceof MongooseError.DivergentArrayError) {
+    throw new BadRequestException(
+      `Cannot save ${record} due to conflicting array modifications`,
+    );
   }
 
   if (error instanceof AppError) {

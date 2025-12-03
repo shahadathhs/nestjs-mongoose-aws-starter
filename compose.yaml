@@ -64,7 +64,7 @@ services:
       - .env
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/${PACKAGE_NAME}_db
+      MONGODB_URI: mongodb://mongodb:27017/${PACKAGE_NAME}_db
 
       REDIS_HOST: redis-master
       REDIS_PORT: 6379
@@ -74,15 +74,14 @@ services:
     ports:
       - '3000:3000'
     depends_on:
-      db:
+      mongodb:
         condition: service_healthy
       redis-master:
         condition: service_healthy
     command: >
       sh -c "
-        echo '🏁 Waiting for DB...';
+        echo '🏁 Waiting for MongoDB...';
         sleep 5;
-        npx prisma migrate deploy;
         echo '🚀 Starting app...';
         pnpm start
       "
@@ -95,22 +94,19 @@ services:
       timeout: 10s
       retries: 5
 
-  db:
+  mongodb:
     profiles: ['dev', 'prod']
-    image: postgres:17
-    container_name: ${PACKAGE_NAME}_db
+    image: mongo:8
+    container_name: ${PACKAGE_NAME}_mongodb
     restart: always
-    user: postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: ${PACKAGE_NAME}_db
+      MONGO_INITDB_DATABASE: ${PACKAGE_NAME}_db
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - mongodb_data:/data/db
     ports:
-      - '127.0.0.1:5433:5432'
+      - '127.0.0.1:27017:27017'
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      test: ['CMD', 'mongosh', '--eval', 'db.adminCommand("ping")']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -160,7 +156,7 @@ services:
     restart: always
 
 volumes:
-  db_data:
+  mongodb_data:
   files-data:
   temp-data:
   caddy_data:

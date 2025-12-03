@@ -1,4 +1,4 @@
-import { User } from '@prisma';
+import { User } from '@/lib/database/schemas/user.schema';
 
 export interface GenericPayload {
   adminId: string;

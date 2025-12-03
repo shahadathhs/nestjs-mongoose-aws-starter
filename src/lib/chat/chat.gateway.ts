@@ -1,11 +1,13 @@
 import { EventsEnum } from '@/common/enum/queue-events.enum';
 import { BaseGateway } from '@/core/socket/base.gateway';
+import { User } from '@/lib/database/schemas/user.schema';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { InjectModel } from '@nestjs/mongoose';
 import { SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
+import { Model } from 'mongoose';
 import { Socket } from 'socket.io';
-import { PrismaService } from '../prisma/prisma.service';
 import {
   ConversationActionDto,
   InitConversationWithUserDto,
@@ -33,12 +35,12 @@ import { ConversationQueryService } from './services/conversation-query.service'
 export class ChatGateway extends BaseGateway {
   constructor(
     protected readonly configService: ConfigService,
-    protected readonly prisma: PrismaService,
+    @InjectModel(User.name) protected readonly userModel: Model<User>,
     protected readonly jwtService: JwtService,
     private readonly conversationQueryService: ConversationQueryService,
     private readonly conversationMutationService: ConversationMutationService,
   ) {
-    super(configService, prisma, jwtService, ChatGateway.name);
+    super(configService, userModel, jwtService, ChatGateway.name);
   }
 
   /** ---------------- Conversation Handlers ---------------- */

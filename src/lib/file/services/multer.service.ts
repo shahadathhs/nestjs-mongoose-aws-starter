@@ -1,6 +1,6 @@
+import { FileType } from '@/lib/database/enums';
 import { Injectable } from '@nestjs/common';
 import { MulterOptions } from '@nestjs/platform-express/multer/interfaces/multer-options.interface';
-import { FileType } from '@prisma';
 import { diskStorage } from 'multer';
 import * as path from 'path';
 import { v4 as uuid } from 'uuid';

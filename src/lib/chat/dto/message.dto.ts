@@ -1,5 +1,5 @@
+import { MessageDeliveryStatus, MessageType } from '@/lib/database/enums';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { MessageDeliveryStatus, MessageType } from '@prisma';
 import {
   IsArray,
   IsEnum,

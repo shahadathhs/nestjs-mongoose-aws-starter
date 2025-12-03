@@ -1,13 +1,15 @@
 import { successResponse, TResponse } from '@/common/utils/response.util';
 import { HandleError } from '@/core/error/handle-error.decorator';
-import { PrismaService } from '@/lib/prisma/prisma.service';
+import { User } from '@/lib/database/schemas/user.schema';
 import { AuthUtilsService } from '@/lib/utils/services/auth-utils.service';
 import { Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 
 @Injectable()
 export class AuthGetProfileService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectModel(User.name) protected readonly userModel: Model<User>,
     private readonly authUtils: AuthUtilsService,
   ) {}
 
@@ -24,24 +26,10 @@ export class AuthGetProfileService {
     const where: any = {};
     where[key] = value;
 
-    const user = await this.prisma.client.user.findUniqueOrThrow({
-      where,
-      include: {
-        notifications: true,
-      },
-    });
+    const user = await this.userModel.findOne({ where });
 
-    // Extract only the main user fields
-    const { notifications, ...mainUser } = user;
+    const sanitizedUser = await this.authUtils.sanitizeUser(user);
 
-    const sanitizedUser = await this.authUtils.sanitizeUser(mainUser);
-
-    // Rebuild the full object: sanitized user + full raw relations
-    const data = {
-      ...sanitizedUser,
-      notifications,
-    };
-
-    return successResponse(data, 'User data fetched successfully');
+    return successResponse(sanitizedUser, 'User data fetched successfully');
   }
 }

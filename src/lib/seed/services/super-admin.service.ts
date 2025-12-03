@@ -1,15 +1,17 @@
 import { ENVEnum } from '@/common/enum/env.enum';
-import { PrismaService } from '@/lib/prisma/prisma.service';
+import { User } from '@/lib/database/schemas/user.schema';
 import { AuthUtilsService } from '@/lib/utils/services/auth-utils.service';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 
 @Injectable()
 export class SuperAdminService implements OnModuleInit {
   private readonly logger = new Logger(SuperAdminService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectModel(User.name) protected readonly userModel: Model<User>,
     private readonly authUtils: AuthUtilsService,
     private readonly configService: ConfigService,
   ) {}
@@ -26,7 +28,7 @@ export class SuperAdminService implements OnModuleInit {
       ENVEnum.SUPER_ADMIN_PASS,
     );
 
-    const superAdminExists = await this.prisma.client.user.findFirst({
+    const superAdminExists = await this.userModel.findOne({
       where: {
         email: superAdminEmail,
       },
@@ -34,16 +36,14 @@ export class SuperAdminService implements OnModuleInit {
 
     // * create super admin
     if (!superAdminExists) {
-      await this.prisma.client.user.create({
-        data: {
-          name: 'Super Admin',
-          email: superAdminEmail,
-          password: await this.authUtils.hash(superAdminPass),
-          role: 'SUPER_ADMIN',
-          isVerified: true,
-          lastLoginAt: new Date(),
-          lastActiveAt: new Date(),
-        },
+      await this.userModel.create({
+        name: 'Super Admin',
+        email: superAdminEmail,
+        password: await this.authUtils.hash(superAdminPass),
+        role: 'SUPER_ADMIN',
+        isVerified: true,
+        lastLoginAt: new Date(),
+        lastActiveAt: new Date(),
       });
       this.logger.log(
         `[CREATE] Super Admin user created with email: ${superAdminEmail}`,
@@ -52,17 +52,17 @@ export class SuperAdminService implements OnModuleInit {
     }
 
     // * Log & update if super admin already exists
-    await this.prisma.client.user.update({
-      where: {
-        email: superAdminEmail,
+    await this.userModel.updateOne(
+      { email: superAdminEmail },
+      {
+        $set: {
+          isVerified: true,
+          role: 'SUPER_ADMIN',
+          lastActiveAt: new Date(),
+          lastLoginAt: new Date(),
+        },
       },
-      data: {
-        isVerified: true,
-        role: 'SUPER_ADMIN',
-        lastActiveAt: new Date(),
-        lastLoginAt: new Date(),
-      },
-    });
+    );
 
     this.logger.log(
       `[UPDATE] Super Admin user updated with email: ${superAdminEmail}`,

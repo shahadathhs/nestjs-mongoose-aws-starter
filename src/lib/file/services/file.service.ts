@@ -1,27 +1,28 @@
 import { AppError } from '@/core/error/handle-error.app';
 import { HandleError } from '@/core/error/handle-error.decorator';
+import { FileType } from '@/lib/database/enums';
+import { FileInstance } from '@/lib/database/schemas/file-instance.schema';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { FileType } from '@prisma';
+import { InjectModel } from '@nestjs/mongoose';
 import * as fs from 'fs';
 import mime from 'mime-types';
+import { Model } from 'mongoose';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { PrismaService } from '../../prisma/prisma.service';
 import { CreateFileDto } from '../dto/create-file.dto';
 
 @Injectable()
 export class FileService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectModel(FileInstance.name)
+    private readonly fileInstanceModel: Model<FileInstance>,
     private readonly configService: ConfigService,
   ) {}
 
   @HandleError('Error creating file', 'file')
   async create(createFileDto: CreateFileDto) {
-    const file = await this.prisma.client.fileInstance.create({
-      data: createFileDto,
-    });
+    const file = await this.fileInstanceModel.create(createFileDto);
 
     if (!file) {
       throw new AppError(400, 'Error creating file');
@@ -32,9 +33,7 @@ export class FileService {
 
   @HandleError('Error finding file', 'file')
   async findOne(id: string) {
-    const file = await this.prisma.client.fileInstance.findUnique({
-      where: { id },
-    });
+    const file = await this.fileInstanceModel.findById(id);
 
     if (!file) {
       throw new AppError(400, 'Error creating file');
@@ -45,9 +44,7 @@ export class FileService {
 
   @HandleError('Error finding file', 'file')
   async findByFilename(filename: string) {
-    const file = await this.prisma.client.fileInstance.findFirst({
-      where: { filename },
-    });
+    const file = await this.fileInstanceModel.findOne({ filename });
 
     if (!file) {
       throw new AppError(400, 'Error creating file');
@@ -69,9 +66,7 @@ export class FileService {
       throw new AppError(400, 'Error deleting file');
     }
 
-    await this.prisma.client.fileInstance.delete({
-      where: { id },
-    });
+    await this.fileInstanceModel.findByIdAndDelete(id);
   }
 
   @HandleError('Error processing uploaded file', 'file')

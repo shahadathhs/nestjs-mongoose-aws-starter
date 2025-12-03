@@ -34,7 +34,10 @@ export class AuthLoginService {
 
     // 1. Email verification
     if (!user.isVerified) {
-      const otp = await this.utils.generateOTPAndSave(user._id, OtpType.VERIFICATION);
+      const otp = await this.utils.generateOTPAndSave(
+        user._id,
+        OtpType.VERIFICATION,
+      );
 
       await this.authMailService.sendVerificationCodeEmail(
         user.email,

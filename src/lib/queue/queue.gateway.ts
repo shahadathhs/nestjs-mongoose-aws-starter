@@ -1,11 +1,17 @@
 import { QueueEventsEnum } from '@/common/enum/queue-events.enum';
 import { BaseGateway } from '@/core/socket/base.gateway';
+import {
+  Notification,
+  UserNotification,
+} from '@/lib/database/schemas/notification.schema';
+import { User } from '@/lib/database/schemas/user.schema';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { InjectModel } from '@nestjs/mongoose';
 import { WebSocketGateway } from '@nestjs/websockets';
+import { Model } from 'mongoose';
 import { Socket } from 'socket.io';
-import { PrismaService } from '../prisma/prisma.service';
 import { NotificationPayload } from './interface/queue.payload';
 
 @WebSocketGateway({
@@ -26,10 +32,14 @@ import { NotificationPayload } from './interface/queue.payload';
 export class QueueGateway extends BaseGateway {
   constructor(
     protected readonly configService: ConfigService,
-    protected readonly prisma: PrismaService,
+    @InjectModel(User.name) protected readonly userModel: Model<User>,
     protected readonly jwtService: JwtService,
+    @InjectModel(Notification.name)
+    private readonly notificationModel: Model<Notification>,
+    @InjectModel(UserNotification.name)
+    private readonly userNotificationModel: Model<UserNotification>,
   ) {
-    super(configService, prisma, jwtService, QueueGateway.name);
+    super(configService, userModel, jwtService, QueueGateway.name);
   }
 
   /** --- NOTIFICATIONS --- */
@@ -43,17 +53,22 @@ export class QueueGateway extends BaseGateway {
     data: NotificationPayload,
   ) {
     const clients = this.getClients(userId);
-    const notification = await this.prisma.client.notification.create({
-      data: {
-        type: data.type,
-        title: data.title,
-        message: data.message,
-        meta: data.meta ?? {},
-        users: { create: { userId } },
-      },
+
+    // Create notification
+    const notification = await this.notificationModel.create({
+      type: data.type,
+      title: data.title,
+      message: data.message,
+      meta: data.meta ?? {},
     });
 
-    const payload = { ...data, notificationId: notification.id };
+    // Create user notification link
+    await this.userNotificationModel.create({
+      userId,
+      notificationId: notification._id,
+    });
+
+    const payload = { ...data, notificationId: notification._id };
     clients.forEach((client) => client.emit(event, payload));
     this.logger.log(`Notification sent to user ${userId} via ${event}`);
   }
@@ -70,25 +85,24 @@ export class QueueGateway extends BaseGateway {
     event: QueueEventsEnum,
     data: NotificationPayload,
   ) {
-    // Get all user from DB
-    const users = await this.prisma.client.user.findMany({
-      select: { id: true },
+    // Get all users from DB
+    const users = await this.userModel.find().select('_id').lean();
+
+    // Create notification
+    const notification = await this.notificationModel.create({
+      type: data.type,
+      title: data.title,
+      message: data.message,
+      meta: data.meta ?? {},
     });
 
-    // Store notification in DB for all users at once
-    const notification = await this.prisma.client.notification.create({
-      data: {
-        type: data.type,
-        title: data.title,
-        message: data.message,
-        meta: data.meta ?? {},
-        users: {
-          createMany: {
-            data: users.map((u) => ({ userId: u.id })),
-          },
-        },
-      },
-    });
+    // Create user notification links for all users
+    await this.userNotificationModel.insertMany(
+      users.map((u) => ({
+        userId: u._id,
+        notificationId: notification._id,
+      })),
+    );
 
     // Check if any user is connected
     const userIds = Array.from(this.clients.keys());
@@ -98,7 +112,7 @@ export class QueueGateway extends BaseGateway {
     }
 
     // Add notificationId to payload
-    const payload = { ...data, notificationId: notification.id };
+    const payload = { ...data, notificationId: notification._id };
 
     // Emit to all connected clients
     this.clients.forEach((clients) =>
@@ -109,29 +123,32 @@ export class QueueGateway extends BaseGateway {
   }
 
   public async emitToAdmins(event: QueueEventsEnum, data: NotificationPayload) {
-    const admins = await this.prisma.client.user.findMany({
-      where: { role: { in: ['ADMIN', 'SUPER_ADMIN'] } },
-      select: { id: true },
-    });
+    const admins = await this.userModel
+      .find({ role: { $in: ['ADMIN', 'SUPER_ADMIN'] } })
+      .select('_id')
+      .lean();
+
     if (!admins.length) return this.logger.warn('No admins found');
 
-    const notification = await this.prisma.client.notification.create({
-      data: {
-        type: data.type,
-        title: data.title,
-        message: data.message,
-        meta: data.meta ?? {},
-        users: {
-          createMany: {
-            data: admins.map((a) => ({ userId: a.id })),
-          },
-        },
-      },
+    // Create notification
+    const notification = await this.notificationModel.create({
+      type: data.type,
+      title: data.title,
+      message: data.message,
+      meta: data.meta ?? {},
     });
 
-    const payload = { ...data, notificationId: notification.id };
+    // Create user notification links for all admins
+    await this.userNotificationModel.insertMany(
+      admins.map((a) => ({
+        userId: a._id,
+        notificationId: notification._id,
+      })),
+    );
+
+    const payload = { ...data, notificationId: notification._id };
     admins.forEach((a) =>
-      this.getClients(a.id).forEach((c) => c.emit(event, payload)),
+      this.getClients(a._id).forEach((c) => c.emit(event, payload)),
     );
 
     this.logger.log(

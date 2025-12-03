@@ -15,6 +15,7 @@ export enum OtpType {
   RESET = 'RESET',
 }
 
+// * Keep the naming in small caps to sync with mimetype
 export enum FileType {
   image = 'image',
   docs = 'docs',

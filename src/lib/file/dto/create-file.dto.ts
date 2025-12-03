@@ -1,4 +1,4 @@
-import { FileType } from '@prisma';
+import { FileType } from '@/lib/database/enums';
 import { IsEnum, IsNumber, IsString } from 'class-validator';
 
 export class CreateFileDto {

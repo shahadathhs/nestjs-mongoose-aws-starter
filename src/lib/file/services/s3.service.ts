@@ -1,6 +1,7 @@
 import { ENVEnum } from '@/common/enum/env.enum';
 import { AppError } from '@/core/error/handle-error.app';
-import { PrismaService } from '@/lib/prisma/prisma.service';
+import { FileType } from '@/lib/database/enums';
+import { FileInstance } from '@/lib/database/schemas/file-instance.schema';
 import {
   DeleteObjectCommand,
   PutObjectCommand,
@@ -8,8 +9,9 @@ import {
 } from '@aws-sdk/client-s3';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { FileType } from '@prisma';
+import { InjectModel } from '@nestjs/mongoose';
 import * as fs from 'fs';
+import { Model } from 'mongoose';
 import path from 'node:path';
 import { v4 as uuid } from 'uuid';
 
@@ -21,7 +23,8 @@ export class S3Service {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly prisma: PrismaService,
+    @InjectModel(FileInstance.name)
+    private readonly fileInstanceModel: Model<FileInstance>,
   ) {
     this.AWS_REGION = this.configService.getOrThrow(ENVEnum.AWS_REGION);
     this.AWS_S3_BUCKET_NAME = this.configService.getOrThrow(
@@ -75,23 +78,21 @@ export class S3Service {
     const fileUrl = await this.uploadBuffer(s3Key, file.buffer, file.mimetype);
 
     // Save record in database
-    const fileRecord = await this.prisma.client.fileInstance.create({
-      data: {
-        filename: uniqueFileName,
-        originalFilename: file.originalname,
-        path: s3Key,
-        url: fileUrl,
-        fileType: this.getFileType(file.mimetype),
-        mimeType: file.mimetype,
-        size: file.size,
-      },
+    const fileRecord = await this.fileInstanceModel.create({
+      filename: uniqueFileName,
+      originalFilename: file.originalname,
+      path: s3Key,
+      url: fileUrl,
+      fileType: this.getFileType(file.mimetype),
+      mimeType: file.mimetype,
+      size: file.size,
     });
 
     return fileRecord;
   }
 
   async deleteFile(id: string) {
-    const file = await this.prisma.client.fileInstance.findUnique({
+    const file = await this.fileInstanceModel.findOne({
       where: { id },
     });
 
@@ -101,7 +102,7 @@ export class S3Service {
 
     await this.deleteObject(file.path);
 
-    await this.prisma.client.fileInstance.delete({
+    await this.fileInstanceModel.deleteOne({
       where: { id },
     });
   }
@@ -132,16 +133,14 @@ export class S3Service {
     const fileUrl = `https://${this.AWS_S3_BUCKET_NAME}.s3.${this.AWS_REGION}.amazonaws.com/${s3Key}`;
 
     // Save record in DB
-    const fileRecord = await this.prisma.client.fileInstance.create({
-      data: {
-        filename: uniqueFileName,
-        originalFilename: originalName || path.basename(filePath),
-        path: s3Key,
-        url: fileUrl,
-        fileType: this.getFileType(mimeType),
-        mimeType,
-        size: fileBuffer.length,
-      },
+    const fileRecord = await this.fileInstanceModel.create({
+      filename: uniqueFileName,
+      originalFilename: originalName || path.basename(filePath),
+      path: s3Key,
+      url: fileUrl,
+      fileType: this.getFileType(mimeType),
+      mimeType,
+      size: fileBuffer.length,
     });
 
     // Delete file from disk
@@ -158,11 +157,11 @@ export class S3Service {
   }
 
   getFileType(mimeType: string): FileType {
-    if (mimeType.startsWith('image/')) return 'image';
-    if (mimeType.startsWith('audio/')) return 'audio';
-    if (mimeType.startsWith('video/')) return 'video';
-    if (mimeType === 'application/pdf') return 'document';
-    return 'any';
+    if (mimeType.startsWith('image/')) return FileType.image;
+    if (mimeType.startsWith('audio/')) return FileType.audio;
+    if (mimeType.startsWith('video/')) return FileType.video;
+    if (mimeType === 'application/pdf') return FileType.document;
+    return FileType.docs;
   }
 
   getMimeTypeFromExtension(ext: string): string {

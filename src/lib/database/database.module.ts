@@ -2,12 +2,36 @@ import { ENVEnum } from '@/common/enum/env.enum';
 import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { FileInstance, FileInstanceSchema } from './schemas/file-instance.schema';
-import { Notification, NotificationSchema, UserNotification, UserNotificationSchema } from './schemas/notification.schema';
-import { PrivateCall, PrivateCallParticipant, PrivateCallParticipantSchema, PrivateCallSchema } from './schemas/private-call.schema';
-import { PrivateConversation, PrivateConversationSchema } from './schemas/private-conversation.schema';
-import { PrivateMessage, PrivateMessageSchema, PrivateMessageStatus, PrivateMessageStatusSchema } from './schemas/private-message.schema';
-import { RefreshToken, RefreshTokenSchema } from './schemas/refresh-token.schema';
+import {
+  FileInstance,
+  FileInstanceSchema,
+} from './schemas/file-instance.schema';
+import {
+  Notification,
+  NotificationSchema,
+  UserNotification,
+  UserNotificationSchema,
+} from './schemas/notification.schema';
+import {
+  PrivateCall,
+  PrivateCallParticipant,
+  PrivateCallParticipantSchema,
+  PrivateCallSchema,
+} from './schemas/private-call.schema';
+import {
+  PrivateConversation,
+  PrivateConversationSchema,
+} from './schemas/private-conversation.schema';
+import {
+  PrivateMessage,
+  PrivateMessageSchema,
+  PrivateMessageStatus,
+  PrivateMessageStatusSchema,
+} from './schemas/private-message.schema';
+import {
+  RefreshToken,
+  RefreshTokenSchema,
+} from './schemas/refresh-token.schema';
 import { UserOtp, UserOtpSchema } from './schemas/user-otp.schema';
 import { User, UserSchema } from './schemas/user.schema';
 
@@ -32,7 +56,10 @@ import { User, UserSchema } from './schemas/user.schema';
       { name: PrivateMessage.name, schema: PrivateMessageSchema },
       { name: PrivateMessageStatus.name, schema: PrivateMessageStatusSchema },
       { name: PrivateCall.name, schema: PrivateCallSchema },
-      { name: PrivateCallParticipant.name, schema: PrivateCallParticipantSchema },
+      {
+        name: PrivateCallParticipant.name,
+        schema: PrivateCallParticipantSchema,
+      },
     ]),
   ],
   exports: [MongooseModule],

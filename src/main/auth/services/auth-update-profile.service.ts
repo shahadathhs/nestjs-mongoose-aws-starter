@@ -1,17 +1,19 @@
 import { successResponse } from '@/common/utils/response.util';
 import { AppError } from '@/core/error/handle-error.app';
 import { HandleError } from '@/core/error/handle-error.decorator';
+import { FileInstance } from '@/lib/database/schemas/file-instance.schema';
+import { User, UserDocument } from '@/lib/database/schemas/user.schema';
 import { S3Service } from '@/lib/file/services/s3.service';
-import { PrismaService } from '@/lib/prisma/prisma.service';
 import { AuthUtilsService } from '@/lib/utils/services/auth-utils.service';
 import { Injectable } from '@nestjs/common';
-import { FileInstance } from '@prisma';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 
 @Injectable()
 export class AuthUpdateProfileService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     private readonly authUtils: AuthUtilsService,
     private readonly s3: S3Service,
   ) {}
@@ -22,7 +24,7 @@ export class AuthUpdateProfileService {
     dto: UpdateProfileDto,
     file?: Express.Multer.File,
   ) {
-    const user = await this.prisma.client.user.findUnique({
+    const user = await this.userModel.findById({
       where: { id: userId },
     });
 
@@ -40,9 +42,9 @@ export class AuthUpdateProfileService {
       }
     }
 
-    const updatedUser = await this.prisma.client.user.update({
-      where: { id: userId },
-      data: {
+    const updatedUser = await this.userModel.updateOne(
+      { id: userId },
+      {
         name: dto.name?.trim() ? dto.name.trim() : user.name,
         ...(fileInstance && {
           profilePicture: {
@@ -50,8 +52,7 @@ export class AuthUpdateProfileService {
           },
         }),
       },
-      include: { profilePicture: true },
-    });
+    );
 
     return successResponse(
       await this.authUtils.sanitizeUser(updatedUser),

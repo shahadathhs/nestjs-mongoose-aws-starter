@@ -121,8 +121,6 @@ local:
 	@sleep 3
 	@echo "Installing dependencies..."
 	pnpm install
-	@echo "Database migrations..."
-	npx prisma migrate deploy
 	@echo "Starting application in development mode..."
 	pnpm dev
 

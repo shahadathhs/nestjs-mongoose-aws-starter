@@ -1,6 +1,8 @@
-import { PrismaService } from '@/lib/prisma/prisma.service';
+import { CallStatus } from '@/lib/database/enums';
+import { PrivateCall } from '@/lib/database/schemas/private-call.schema';
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
-import { CallStatus } from '@prisma';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { ChatGateway } from '../chat.gateway';
 
 @Injectable()
@@ -14,7 +16,8 @@ export class CallService {
   private ringTimeouts = new Map<string, NodeJS.Timeout>();
 
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectModel(PrivateCall.name)
+    private readonly callModel: Model<PrivateCall>,
     @Inject(forwardRef(() => ChatGateway))
     private readonly chatGateway: ChatGateway,
   ) {
@@ -85,9 +88,9 @@ export class CallService {
     const t = setTimeout(async () => {
       try {
         this.logger.log(`Call ${callId} ring timeout -> marking missed`);
-        await this.prisma.client.privateCall.update({
-          where: { id: callId },
-          data: { status: CallStatus.MISSED, endedAt: new Date() },
+        await this.callModel.findByIdAndUpdate(callId, {
+          status: CallStatus.MISSED,
+          endedAt: new Date(),
         });
         this.callSocketMap.delete(callId);
         this.logger.log(`Call ${callId} marked as missed due to timeout`);

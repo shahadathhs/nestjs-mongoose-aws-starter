@@ -1,5 +1,5 @@
+import { CallType } from '@/lib/database/enums';
 import { ApiProperty } from '@nestjs/swagger';
-import { CallType } from '@prisma';
 import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
 
 export class InitiateCallDto {

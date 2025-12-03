@@ -1,9 +1,12 @@
 import { EventsEnum } from '@/common/enum/queue-events.enum';
 import { successResponse } from '@/common/utils/response.util';
 import { SocketSafe } from '@/core/socket/socket-safe.decorator';
-import { PrismaService } from '@/lib/prisma/prisma.service';
+import { ConversationStatus } from '@/lib/database/enums';
+import { PrivateConversation } from '@/lib/database/schemas/private-conversation.schema';
+import { User } from '@/lib/database/schemas/user.schema';
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
-import { ConversationStatus } from '@prisma';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { Socket } from 'socket.io';
 import { ChatGateway } from '../chat.gateway';
 import {
@@ -16,7 +19,10 @@ export class ConversationMutationService {
   private logger = new Logger(ConversationMutationService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectModel(PrivateConversation.name)
+    private readonly conversationModel: Model<PrivateConversation>,
+    @InjectModel(User.name)
+    private readonly userModel: Model<User>,
     @Inject(forwardRef(() => ChatGateway))
     private readonly chatGateway: ChatGateway,
   ) {}
@@ -41,112 +47,93 @@ export class ConversationMutationService {
     }
 
     // Check if conversation already exists (bidirectional)
-    let conversation = await this.prisma.client.privateConversation.findFirst({
-      where: {
-        OR: [
+    let conversation = await this.conversationModel
+      .findOne({
+        $or: [
           { initiatorId, receiverId: targetUserId },
           { initiatorId: targetUserId, receiverId: initiatorId },
         ],
-      },
-      include: {
-        initiator: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            profilePictureId: true,
-          },
+      })
+      .populate({
+        path: 'initiatorId',
+        select: '_id name email profilePictureId',
+      })
+      .populate({
+        path: 'receiverId',
+        select: '_id name email profilePictureId',
+      })
+      .populate({
+        path: 'lastMessageId',
+        populate: {
+          path: 'senderId',
+          select: '_id name',
         },
-        receiver: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            profilePictureId: true,
-          },
-        },
-        lastMessage: {
-          include: {
-            sender: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-      },
-    });
+      })
+      .lean();
 
     if (conversation) {
-      this.logger.log(`Found existing conversation ${conversation.id}`);
+      this.logger.log(`Found existing conversation ${conversation._id}`);
     } else {
       // Verify target user exists
-      const targetUser = await this.prisma.client.user.findUnique({
-        where: { id: targetUserId },
-      });
+      const targetUser = await this.userModel.findById(targetUserId);
 
       if (!targetUser) {
         throw new Error('Target user not found');
       }
 
       // Create new conversation
-      conversation = await this.prisma.client.privateConversation.create({
-        data: {
-          initiatorId,
-          receiverId: targetUserId,
-        },
-        include: {
-          initiator: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              profilePictureId: true,
-            },
-          },
-          receiver: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              profilePictureId: true,
-            },
-          },
-          lastMessage: {
-            include: {
-              sender: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
-        },
+      const newConversation = await this.conversationModel.create({
+        initiatorId,
+        receiverId: targetUserId,
       });
 
-      this.logger.log(`Created new conversation ${conversation.id}`);
+      conversation = await this.conversationModel
+        .findById(newConversation._id)
+        .populate({
+          path: 'initiatorId',
+          select: '_id name email profilePictureId',
+        })
+        .populate({
+          path: 'receiverId',
+          select: '_id name email profilePictureId',
+        })
+        .populate({
+          path: 'lastMessageId',
+          populate: {
+            path: 'senderId',
+            select: '_id name',
+          },
+        })
+        .lean();
+
+      if (!conversation) {
+        throw new Error('Failed to create conversation');
+      }
+
+      this.logger.log(`Created new conversation ${conversation._id}`);
     }
 
+    // Type assertion for populated fields
+    const populatedConversation = conversation as any;
+
     const otherParticipant =
-      conversation.initiatorId === initiatorId
-        ? conversation.receiver
-        : conversation.initiator;
+      populatedConversation.initiatorId._id === initiatorId
+        ? populatedConversation.receiverId
+        : populatedConversation.initiatorId;
 
     const result = {
-      id: conversation.id,
+      id: populatedConversation._id,
       participant: otherParticipant,
-      lastMessage: conversation.lastMessage,
-      status: conversation.status,
-      createdAt: conversation.createdAt,
-      updatedAt: conversation.updatedAt,
+      lastMessage: populatedConversation.lastMessageId,
+      status: populatedConversation.status,
+      createdAt: populatedConversation.createdAt,
+      updatedAt: populatedConversation.updatedAt,
     };
 
     client.emit(EventsEnum.SUCCESS, successResponse(result));
 
     // Notify the other participant if online
-    const otherUserId = result.participant.id;
+    const otherUserId = result.participant._id;
     this.chatGateway.emitToUserFirstSocket(
       otherUserId,
       EventsEnum.CONVERSATION_UPDATE,
@@ -169,13 +156,12 @@ export class ConversationMutationService {
     );
 
     // Get conversation details before deleting to notify other participant
-    const conversationData =
-      await this.prisma.client.privateConversation.findFirst({
-        where: {
-          id: conversationId,
-          OR: [{ initiatorId: userId }, { receiverId: userId }],
-        },
-      });
+    const conversationData = await this.conversationModel
+      .findOne({
+        _id: conversationId,
+        $or: [{ initiatorId: userId }, { receiverId: userId }],
+      })
+      .lean();
 
     if (!conversationData) {
       throw new Error('Conversation not found or unauthorized');
@@ -186,9 +172,7 @@ export class ConversationMutationService {
         ? conversationData.receiverId
         : conversationData.initiatorId;
 
-    await this.prisma.client.privateConversation.delete({
-      where: { id: conversationId },
-    });
+    await this.conversationModel.findByIdAndDelete(conversationId);
 
     this.logger.log(`Deleted conversation ${conversationId}`);
 
@@ -254,7 +238,7 @@ export class ConversationMutationService {
     client.emit(EventsEnum.CONVERSATION_UPDATE, successResponse(conversation));
 
     // Notify the other participant if online
-    const otherUserId = conversation.participant.id;
+    const otherUserId = conversation.participant._id;
     this.chatGateway.emitToUserFirstSocket(
       otherUserId,
       EventsEnum.CONVERSATION_UPDATE,
@@ -290,7 +274,7 @@ export class ConversationMutationService {
     client.emit(EventsEnum.CONVERSATION_UPDATE, successResponse(conversation));
 
     // Notify the other participant if online
-    const otherUserId = conversation.participant.id;
+    const otherUserId = conversation.participant._id;
     this.chatGateway.emitToUserFirstSocket(
       otherUserId,
       EventsEnum.CONVERSATION_UPDATE,
@@ -312,51 +296,47 @@ export class ConversationMutationService {
     status: ConversationStatus,
   ) {
     // Verify user is a participant
-    const conversation = await this.prisma.client.privateConversation.findFirst(
-      {
-        where: {
-          id: conversationId,
-          OR: [{ initiatorId: userId }, { receiverId: userId }],
-        },
-      },
-    );
+    const conversation = await this.conversationModel
+      .findOne({
+        _id: conversationId,
+        $or: [{ initiatorId: userId }, { receiverId: userId }],
+      })
+      .lean();
 
     if (!conversation) {
       throw new Error('Conversation not found or unauthorized');
     }
 
-    const updated = await this.prisma.client.privateConversation.update({
-      where: { id: conversationId },
-      data: { status },
-      include: {
-        initiator: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            profilePictureId: true,
-          },
-        },
-        receiver: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            profilePictureId: true,
-          },
-        },
-      },
-    });
+    const updated = await this.conversationModel
+      .findByIdAndUpdate(conversationId, { status }, { new: true })
+      .populate({
+        path: 'initiatorId',
+        select: '_id name email profilePictureId',
+      })
+      .populate({
+        path: 'receiverId',
+        select: '_id name email profilePictureId',
+      })
+      .lean();
+
+    if (!updated) {
+      throw new Error('Failed to update conversation');
+    }
+
+    // Type assertion for populated fields
+    const populatedUpdated = updated as any;
 
     const otherParticipant =
-      updated.initiatorId === userId ? updated.receiver : updated.initiator;
+      populatedUpdated.initiatorId._id === userId
+        ? populatedUpdated.receiverId
+        : populatedUpdated.initiatorId;
 
     return {
-      id: updated.id,
+      id: populatedUpdated._id,
       participant: otherParticipant,
-      status: updated.status,
-      createdAt: updated.createdAt,
-      updatedAt: updated.updatedAt,
+      status: populatedUpdated.status,
+      createdAt: populatedUpdated.createdAt,
+      updatedAt: populatedUpdated.updatedAt,
     };
   }
 }

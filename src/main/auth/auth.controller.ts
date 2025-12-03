@@ -1,4 +1,5 @@
 import { GetUser, ValidateAuth } from '@/core/jwt/jwt.decorator';
+import { FileType } from '@/lib/database/enums';
 import { MulterService } from '@/lib/file/services/multer.service';
 import {
   Body,
@@ -16,7 +17,6 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { FileType } from '@prisma';
 import { LoginDto } from './dto/login.dto';
 import { LogoutDto, RefreshTokenDto } from './dto/logout.dto';
 import { ResendOtpDto, VerifyOTPDto } from './dto/otp.dto';
