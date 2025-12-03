@@ -64,7 +64,7 @@ services:
       - .env
     environment:
       NODE_ENV: production
-      MONGODB_URI: mongodb://mongodb:27017/${PACKAGE_NAME}_db
+      MONGODB_URI: mongodb://root:root@mongodb:27017/${PACKAGE_NAME}_db?authSource=admin
 
       REDIS_HOST: redis-master
       REDIS_PORT: 6379
@@ -95,12 +95,13 @@ services:
       retries: 5
 
   mongodb:
-    profiles: ['dev', 'prod']
     image: mongo:8
-    container_name: ${PACKAGE_NAME}_mongodb
-    restart: always
+    container_name: ${PACKAGE_NAME}_dev_mongodb
+    restart: unless-stopped
     environment:
       MONGO_INITDB_DATABASE: ${PACKAGE_NAME}_db
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
     volumes:
       - mongodb_data:/data/db
     ports:
@@ -110,6 +111,24 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  mongo-express:
+    image: mongo-express
+    container_name: ${PACKAGE_NAME}_dev_mongo_express
+    restart: unless-stopped
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongodb
+      ME_CONFIG_MONGODB_PORT: 27017
+      ME_CONFIG_MONGODB_ENABLE_ADMIN: 'true'
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USER}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASS}
+    ports:
+      - '8081:8081'
+    depends_on:
+      mongodb:
+        condition: service_healthy
 
   redis-master:
     profiles: ['dev', 'prod']

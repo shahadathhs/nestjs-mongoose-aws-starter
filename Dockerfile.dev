@@ -16,10 +16,6 @@ COPY package.json pnpm-lock.yaml ./
 # Install dependencies
 RUN pnpm install
 
-# Copy Prisma schema + config
-COPY prisma.config.ts ./
-COPY prisma ./prisma/
-
 # Copy ts & nest config
 COPY tsconfig.json ./
 COPY nest-cli.json ./

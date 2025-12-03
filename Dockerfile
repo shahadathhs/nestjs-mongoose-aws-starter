@@ -8,12 +8,10 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 
 # Install system dependencies for build
-RUN apt update && apt install -y openssl
+RUN apt update && apt install -y
 
-# Copy package, lock file & prisma folder
+# Copy package, lock file
 COPY package.json pnpm-lock.yaml ./
-COPY prisma.config.ts ./
-COPY prisma ./prisma
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
@@ -34,14 +32,12 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 
 # Install system dependencies needed at runtime
-RUN apt update && apt install -y openssl curl
+RUN apt update && apt install -y curl
 
 # Copy necessary files from builder stage
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma.config.ts ./
-COPY --from=builder /app/prisma ./prisma
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
