@@ -33,10 +33,6 @@ export class FileInstance {
 
 export const FileInstanceSchema = SchemaFactory.createForClass(FileInstance);
 
-FileInstanceSchema.virtual('id').get(function () {
-  return this._id;
-});
-
 FileInstanceSchema.set('toJSON', {
   virtuals: true,
   versionKey: false,

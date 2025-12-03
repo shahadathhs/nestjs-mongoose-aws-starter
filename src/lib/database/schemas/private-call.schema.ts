@@ -30,10 +30,6 @@ export class PrivateCall {
 
 export const PrivateCallSchema = SchemaFactory.createForClass(PrivateCall);
 
-PrivateCallSchema.virtual('id').get(function () {
-  return this._id;
-});
-
 PrivateCallSchema.set('toJSON', {
   virtuals: true,
   versionKey: false,
@@ -75,10 +71,6 @@ export const PrivateCallParticipantSchema = SchemaFactory.createForClass(
 );
 
 PrivateCallParticipantSchema.index({ callId: 1, userId: 1 }, { unique: true });
-
-PrivateCallParticipantSchema.virtual('id').get(function () {
-  return this._id;
-});
 
 PrivateCallParticipantSchema.set('toJSON', {
   virtuals: true,

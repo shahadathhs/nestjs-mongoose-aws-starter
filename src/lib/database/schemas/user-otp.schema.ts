@@ -24,10 +24,6 @@ export class UserOtp {
 
 export const UserOtpSchema = SchemaFactory.createForClass(UserOtp);
 
-UserOtpSchema.virtual('id').get(function () {
-  return this._id;
-});
-
 UserOtpSchema.set('toJSON', {
   virtuals: true,
   versionKey: false,

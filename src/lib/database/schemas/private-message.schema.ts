@@ -30,10 +30,6 @@ export const PrivateMessageSchema =
 
 PrivateMessageSchema.index({ conversationId: 1, createdAt: 1 });
 
-PrivateMessageSchema.virtual('id').get(function () {
-  return this._id;
-});
-
 PrivateMessageSchema.set('toJSON', {
   virtuals: true,
   versionKey: false,
@@ -68,10 +64,6 @@ export const PrivateMessageStatusSchema =
   SchemaFactory.createForClass(PrivateMessageStatus);
 
 PrivateMessageStatusSchema.index({ messageId: 1, userId: 1 }, { unique: true });
-
-PrivateMessageStatusSchema.virtual('id').get(function () {
-  return this._id;
-});
 
 PrivateMessageStatusSchema.set('toJSON', {
   virtuals: true,

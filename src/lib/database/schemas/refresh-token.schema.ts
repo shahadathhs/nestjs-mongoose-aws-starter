@@ -20,10 +20,6 @@ export class RefreshToken {
 
 export const RefreshTokenSchema = SchemaFactory.createForClass(RefreshToken);
 
-RefreshTokenSchema.virtual('id').get(function () {
-  return this._id;
-});
-
 RefreshTokenSchema.set('toJSON', {
   virtuals: true,
   versionKey: false,

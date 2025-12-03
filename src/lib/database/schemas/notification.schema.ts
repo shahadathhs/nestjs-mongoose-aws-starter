@@ -23,10 +23,6 @@ export class Notification {
 
 export const NotificationSchema = SchemaFactory.createForClass(Notification);
 
-NotificationSchema.virtual('id').get(function () {
-  return this._id;
-});
-
 NotificationSchema.set('toJSON', {
   virtuals: true,
   versionKey: false,
@@ -59,10 +55,6 @@ UserNotificationSchema.index(
   { userId: 1, notificationId: 1 },
   { unique: true },
 );
-
-UserNotificationSchema.virtual('id').get(function () {
-  return this._id;
-});
 
 UserNotificationSchema.set('toJSON', {
   virtuals: true,

@@ -34,10 +34,6 @@ PrivateConversationSchema.index(
   { unique: true },
 );
 
-PrivateConversationSchema.virtual('id').get(function () {
-  return this._id;
-});
-
 PrivateConversationSchema.set('toJSON', {
   virtuals: true,
   versionKey: false,
