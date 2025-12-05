@@ -35,6 +35,8 @@ import {
 import { UserOtp, UserOtpSchema } from './schemas/user-otp.schema';
 import { User, UserSchema } from './schemas/user.schema';
 
+import { UserRepository } from './repository/user.repository';
+
 @Global()
 @Module({
   imports: [
@@ -62,6 +64,7 @@ import { User, UserSchema } from './schemas/user.schema';
       },
     ]),
   ],
-  exports: [MongooseModule],
+  providers: [UserRepository],
+  exports: [MongooseModule, UserRepository],
 })
 export class DatabaseModule {}
