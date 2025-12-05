@@ -92,9 +92,7 @@ export class S3Service {
   }
 
   async deleteFile(id: string) {
-    const file = await this.fileInstanceModel.findOne({
-      where: { id },
-    });
+    const file = await this.fileInstanceModel.findById(id);
 
     if (!file) {
       throw new AppError(404, 'File not found');
@@ -102,9 +100,7 @@ export class S3Service {
 
     await this.deleteObject(file.path);
 
-    await this.fileInstanceModel.deleteOne({
-      where: { id },
-    });
+    await this.fileInstanceModel.findByIdAndDelete(id);
   }
 
   async uploadFileByPath(filePath: string, originalName?: string) {

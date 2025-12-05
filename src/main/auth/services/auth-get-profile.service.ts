@@ -1,4 +1,5 @@
 import { successResponse, TResponse } from '@/common/utils/response.util';
+import { AppError } from '@/core/error/handle-error.app';
 import { HandleError } from '@/core/error/handle-error.decorator';
 import { User } from '@/lib/database/schemas/user.schema';
 import { AuthUtilsService } from '@/lib/utils/services/auth-utils.service';
@@ -15,18 +16,19 @@ export class AuthGetProfileService {
 
   @HandleError("Can't get user profile")
   async getProfile(userId: string) {
-    const user = await this.findUserBy('id', userId);
+    const user = await this.findUserBy('_id', userId);
     return user;
   }
 
   private async findUserBy(
-    key: 'id' | 'email',
+    key: '_id' | 'email',
     value: string,
   ): Promise<TResponse<any>> {
-    const where: any = {};
-    where[key] = value;
+    const user = await this.userModel.findOne({ [key]: value });
 
-    const user = await this.userModel.findOne({ where });
+    if (!user) {
+      throw new AppError(404, 'User not found');
+    }
 
     const sanitizedUser = await this.authUtils.sanitizeUser(user);
 

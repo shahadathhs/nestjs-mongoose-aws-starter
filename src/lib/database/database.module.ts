@@ -42,7 +42,7 @@ import { User, UserSchema } from './schemas/user.schema';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => ({
-        uri: configService.getOrThrow<string>(ENVEnum.DATABASE_URL),
+        uri: configService.getOrThrow<string>(ENVEnum.MONGODB_URI),
       }),
     }),
     MongooseModule.forFeature([

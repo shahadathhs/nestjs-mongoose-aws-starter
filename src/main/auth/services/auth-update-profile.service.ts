@@ -24,9 +24,7 @@ export class AuthUpdateProfileService {
     dto: UpdateProfileDto,
     file?: Express.Multer.File,
   ) {
-    const user = await this.userModel.findById({
-      where: { id: userId },
-    });
+    const user = await this.userModel.findById(userId);
 
     if (!user) {
       throw new AppError(404, 'User not found');
@@ -42,16 +40,15 @@ export class AuthUpdateProfileService {
       }
     }
 
-    const updatedUser = await this.userModel.updateOne(
-      { id: userId },
+    const updatedUser = await this.userModel.findByIdAndUpdate(
+      userId,
       {
         name: dto.name?.trim() ? dto.name.trim() : user.name,
         ...(fileInstance && {
-          profilePicture: {
-            connect: fileInstance,
-          },
+          profilePictureId: fileInstance._id,
         }),
       },
+      { new: true },
     );
 
     return successResponse(

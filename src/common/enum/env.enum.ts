@@ -1,6 +1,6 @@
 export enum ENVEnum {
   NODE_ENV = 'NODE_ENV',
-  DATABASE_URL = 'DATABASE_URL',
+  MONGODB_URI = 'MONGODB_URI',
 
   PORT = 'PORT',
   BASE_URL = 'BASE_URL',

@@ -29,9 +29,7 @@ export class SuperAdminService implements OnModuleInit {
     );
 
     const superAdminExists = await this.userModel.findOne({
-      where: {
-        email: superAdminEmail,
-      },
+      email: superAdminEmail,
     });
 
     // * create super admin
